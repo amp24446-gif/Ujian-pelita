@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/>
+<title>CBT Ujian - Share via QR Code</title>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+:root{--blue:#4f7ffd;--blue-dark:#3f6bff;--danger:#ff4b4b;--muted:#6b7280;--success:#10b981}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Inter,sans-serif;background:linear-gradient(135deg,#4f7ffd,#5e8bff);color:#071029}
+.container{max-width:1400px;margin:20px auto;padding:10px}
+.center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{width:90%;max-width:380px;background:#fff;padding:28px;border-radius:14px;box-shadow:0 10px 40px rgba(2,6,23,0.3);text-align:center}
+.input{width:100%;padding:12px 14px;border-radius:10px;border:none;background:#f3f4f6;margin-bottom:12px;font-size:15px}
+.password-wrap{position:relative}
+.toggle-pass{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer}
+.btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--blue-dark);color:#fff;font-weight:600;cursor:pointer}
+.btn-small{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;margin:4px;font-size:13px}
+.btn-add{background:var(--blue);color:#fff}
+.btn-edit{background:#ffa938;color:#fff}
+.btn-reset{background:#ff4d4d;color:#fff}
+.btn-delete{background:#374151;color:#fff}
+.btn-export{background:#10b981;color:#fff}
+.btn-import{background:#8b5cf6;color:#fff}
+.btn-share{background:#ec489a;color:#fff}
+.btn-refresh{background:#f59e0b;color:#fff}
+.small{font-size:13px;color:var(--muted)}
+.app{display:none;padding:20px;min-height:100vh;background:#f4f6fb}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;background:#fff;padding:12px 18px;border-radius:12px;flex-wrap:wrap;gap:8px}
+.card{background:#fff;padding:18px;border-radius:12px;box-shadow:0 6px 22px rgba(2,6,23,0.06);margin-bottom:18px}
+.table{width:100%;border-collapse:collapse;margin-top:10px;overflow-x:auto;display:block}
+.table th,.table td{padding:10px;border-bottom:1px solid #eee;text-align:left}
+.table th{background:#eaf2ff}
+.soal{background:#fff;padding:14px;border-radius:10px;margin-bottom:12px;box-shadow:0 4px 14px rgba(2,6,23,0.04)}
+.options label{display:block;margin-bottom:6px;cursor:pointer}
+.essay textarea{width:100%;min-height:120px;padding:12px;border-radius:8px;border:1px solid #e5e7eb}
+.modal{position:fixed;left:0;top:0;width:100%;height:100%;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,0.45);z-index:99}
+.modal .modal-content{background:#fff;padding:20px;border-radius:10px;width:90%;max-width:900px;max-height:80vh;overflow-y:auto}
+.subject-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:12px}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:bold}
+.badge-success{background:#d1fae5;color:#065f46}
+.badge-warning{background:#fed7aa;color:#92400e}
+.badge-info{background:#dbeafe;color:#1e40af}
+.qr-container{text-align:center;padding:20px;background:#fff;border-radius:12px}
+.qr-code{display:flex;justify-content:center;margin:15px 0}
+.share-link{background:#f3f4f6;padding:12px;border-radius:10px;word-break:break-all;font-family:monospace;font-size:12px}
+.sync-card{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:15px;border-radius:12px;margin-bottom:15px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="center-screen">
+  <div class="login-box">
+    <h2>📚 CBT Ujian Online</h2>
+    <select id="roleSelect" class="input">
+      <option value="murid">👨‍🎓 Login Sebagai Murid</option>
+      <option value="guru">👨‍🏫 Login Sebagai Guru</option>
+    </select>
+    <input id="loginUser" class="input" placeholder="Username">
+    <div class="password-wrap">
+      <input id="loginPass" class="input" type="password" placeholder="Password">
+      <span class="toggle-pass" onclick="togglePass()">👁️</span>
+    </div>
+    <button class="btn" onclick="performLogin()">MASUK</button>
+    <div class="small" style="margin-top:10px">Guru: guru/admin | Siswa: siswa1/password</div>
+  </div>
+</div>
+
+<!-- APP MAIN -->
+<div id="app" class="app">
+  <div class="container">
+    <div class="header">
+      <div><strong>📖 CBT Ujian</strong></div>
+      <div><span>👤 <b id="whoLabel">-</b></span>
+      <button class="btn-small" style="background:#ef4444;color:#fff" onclick="logout()">🚪 Logout</button></div>
+    </div>
+
+    <!-- DASHBOARD SISWA -->
+    <div id="studentDashboard" style="display:none;">
+      <div class="card">
+        <h3>📚 Pilih Mata Pelajaran</h3>
+        <div id="subjectsStudentList"></div>
+      </div>
+      <div id="studentScoreBox" class="card" style="display:none;">
+        <h4>📊 Hasil Ujian</h4>
+        <div id="studentResultInfo"></div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD GURU -->
+    <div id="teacherDashboard" style="display:none;">
+      <!-- SHARE CARD - QR CODE & LINK -->
+      <div class="sync-card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="font-size:24px">📤</span>
+          <strong style="font-size:16px">BAGIKAN DATA KE HP LAIN</strong>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn-small" style="background:#ffffff;color:#764ba2;font-weight:bold" onclick="generateShareQR()">📱 Generate QR Code</button>
+          <button class="btn-small" style="background:#ffffff;color:#764ba2;font-weight:bold" onclick="copyShareLink()">🔗 Copy Share Link</button>
+          <button class="btn-small" style="background:#ffffff;color:#764ba2;font-weight:bold" onclick="shareViaWA()">💬 Share ke WhatsApp</button>
+        </div>
+        <div class="small" style="opacity:0.9">
+          💡 <strong>Cara pakai:</strong> Klik "Generate QR Code" → Teman scan QR → Data otomatis masuk ke HP teman!
+        </div>
+      </div>
+      
+      <div class="card">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+          <button class="btn-add btn-small" onclick="openAddSubjectModal()">➕ Tambah Mapel</button>
+          <button class="btn-small btn-add" onclick="openAddStudentModal()">👥 Tambah Siswa</button>
+          <button class="btn-small btn-export" onclick="exportAllCSV()">📥 Export CSV</button>
+          <button class="btn-small btn-export" onclick="exportDatabase()">💾 Export DB</button>
+          <button class="btn-small btn-import" onclick="openImportModal()">📁 Import DB</button>
+          <button class="btn-small btn-refresh" onclick="renderTeacherDashboard()">🔄 Refresh</button>
+        </div>
+        
+        <h3>📖 Daftar Mata Pelajaran (<span id="subjectCount">0</span>)</h3>
+        <div id="subjectsTeacherList"></div>
+        <hr>
+        <h3>👨‍🎓 Daftar Siswa (<span id="studentCount">0</span>)</h3>
+        <div style="overflow-x:auto">
+          <table class="table">
+            <thead><tr><th>Nama</th><th>Username</th><th>Aksi</th></tr></thead>
+            <tbody id="studentsTableBody"></tbody>
+         </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- HALAMAN UJIAN -->
+    <div id="examPage" style="display:none;">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap">
+          <div><h3 id="examSubjectTitle">Ujian</h3><div class="small">Total: <span id="qTotal">0</span> soal</div></div>
+          <div class="small">⏱️ <span id="timerDisplay">00:00</span></div>
+        </div>
+        <div class="small" style="background:#fef3c7;padding:8px;border-radius:8px;margin-bottom:10px">
+          🔒 Jangan keluar dari halaman ini!
+        </div>
+        <form id="examForm" onsubmit="return false;">
+          <div id="questionsContainer"></div>
+          <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+            <button class="btn" onclick="submitExam()">✅ Kirim & Selesai</button>
+            <button class="btn" style="background:#f59e0b" onclick="saveProgress()">💾 Simpan</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- HALAMAN HASIL -->
+    <div id="resultPage" style="display:none;">
+      <div class="card">
+        <h3>📄 Hasil Ujian</h3>
+        <div id="resultDetail"></div>
+        <button class="btn" onclick="backToDashboard()">◀ Kembali</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL QR CODE -->
+<div id="qrModal" class="modal">
+  <div class="modal-content">
+    <h3>📱 Scan QR Code untuk Import Data</h3>
+    <p class="small">Teman cukup scan QR ini menggunakan kamera HP, data akan otomatis masuk!</p>
+    <div class="qr-container">
+      <div id="qrcode" class="qr-code"></div>
+      <div class="share-link" id="shareLinkDisplay"></div>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn" style="background:#25D366;color:#fff" onclick="shareViaWA()">📱 Share ke WhatsApp</button>
+      <button class="btn" style="background:#1DA1F2;color:#fff" onclick="shareViaTwitter()">🐦 Share ke Twitter</button>
+      <button class="btn" style="background:#aaa" onclick="closeQRModal()">Tutup</button>
+    </div>
+    <div class="small" style="margin-top:12px;color:#8b5cf6">
+      ⚠️ Link akan expired dalam 24 jam. Tapi file bisa di-export ulang kapan saja.
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TAMBAH MAPEL -->
+<div id="addSubjectModal" class="modal">
+  <div class="modal-content">
+    <h3>Tambah Mata Pelajaran</h3>
+    <input id="subjectName" class="input" placeholder="Nama Mapel">
+    <input id="subjectDuration" class="input" type="number" placeholder="Durasi (menit)" value="60">
+    <h4>📝 Soal PG</h4>
+    <div id="pgQuestionsContainer"></div>
+    <button class="btn-small btn-add" onclick="addPgField()">+ Tambah PG</button>
+    <h4>📄 Soal Essay</h4>
+    <div id="essayQuestionsContainer"></div>
+    <button class="btn-small btn-add" onclick="addEssayField()">+ Tambah Essay</button>
+    <div style="margin-top:16px">
+      <button class="btn" onclick="saveNewSubject()">Simpan</button>
+      <button class="btn" style="background:#aaa" onclick="closeAddSubjectModal()">Batal</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TAMBAH SISWA -->
+<div id="addStudentModal" class="modal">
+  <div class="modal-content">
+    <h3>Tambah Siswa</h3>
+    <input id="studentUsername" class="input" placeholder="Username">
+    <input id="studentName" class="input" placeholder="Nama Lengkap">
+    <input id="studentPassword" class="input" placeholder="Password" value="password">
+    <button class="btn" onclick="addStudent()">Tambah</button>
+    <button class="btn" style="background:#aaa" onclick="closeAddStudentModal()">Batal</button>
+  </div>
+</div>
+
+<!-- MODAL NILAI ESSAY -->
+<div id="gradeEssayModal" class="modal">
+  <div class="modal-content">
+    <h3>✍️ Penilaian Essay</h3>
+    <div id="gradeEssayContent"></div>
+    <div style="margin-top:16px">
+      <button class="btn" onclick="saveEssayGrades()">💾 Simpan Nilai</button>
+      <button class="btn" style="background:#aaa" onclick="closeGradeModal()">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORT DATABASE -->
+<div id="importModal" class="modal">
+  <div class="modal-content">
+    <h3>📁 Import Database</h3>
+    <p>Pilih file database (.json) atau paste link:</p>
+    <input type="file" id="importFileInput" accept=".json" class="input">
+    <div style="margin:10px 0;text-align:center">— ATAU —</div>
+    <input type="text" id="importLinkInput" class="input" placeholder="Paste link share di sini">
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn" onclick="importFromFile()">Import dari File</button>
+      <button class="btn" style="background:#8b5cf6" onclick="importFromLink()">Import dari Link</button>
+      <button class="btn" style="background:#aaa" onclick="closeImportModal()">Batal</button>
+    </div>
+    <div class="small" style="margin-top:12px;color:#8b5cf6">
+      💡 Atau scan QR Code dari guru untuk import otomatis!
+    </div>
+  </div>
+</div>
+
+<script>
+// ======================== DATA MODEL ========================
+const STORAGE_KEY = 'CBT_SHARE_V8';
+
+const DEFAULT_DATA = {
+  teacher: { username: 'guru', password: 'admin', name: 'Guru Utama' },
+  students: [
+    { username: 'siswa1', name: 'Andi Prasetyo', password: 'password', results: {} },
+    { username: 'siswa2', name: 'Budi Santoso', password: 'password', results: {} }
+  ],
+  subjects: []
+};
+
+let DB = JSON.parse(JSON.stringify(DEFAULT_DATA));
+
+function genId() { return Date.now() + '-' + Math.random().toString(36).substr(2, 8); }
+
+function loadData() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored && stored !== 'undefined' && stored !== 'null') {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === 'object') {
+        DB = parsed;
+      } else {
+        resetToDefault();
+      }
+    } else {
+      resetToDefault();
+    }
+    if (!DB.teacher) DB.teacher = DEFAULT_DATA.teacher;
+    if (!DB.students) DB.students = DEFAULT_DATA.students;
+    if (!DB.subjects) DB.subjects = [];
+    DB.students.forEach(s => { if (!s.results) s.results = {}; });
+    saveData();
+  } catch(e) { resetToDefault(); }
+}
+
+function resetToDefault() {
+  DB = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  DB.subjects = [];
+  saveData();
+}
+
+function saveData() { 
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+}
+
+// ======================== SHARE VIA QR CODE & LINK ========================
+function generateShareQR() {
+  const exportData = {
+    version: '1.0',
+    exportDate: new Date().toISOString(),
+    subjects: DB.subjects,
+    students: DB.students.map(s => ({ username: s.username, name: s.name, password: s.password })),
+    teacher: DB.teacher
+  };
+  
+  const dataStr = JSON.stringify(exportData);
+  // Compress data ke base64 untuk URL
+  const encodedData = btoa(encodeURIComponent(dataStr));
+  const shareUrl = `${window.location.origin}${window.location.pathname}?import=${encodedData}`;
+  
+  // Tampilkan modal dengan QR code
+  document.getElementById('qrModal').style.display = 'flex';
+  document.getElementById('shareLinkDisplay').innerHTML = `<strong>Share Link:</strong><br>${shareUrl.substring(0, 80)}...`;
+  
+  // Generate QR code
+  const qrDiv = document.getElementById('qrcode');
+  qrDiv.innerHTML = '';
+  new QRCode(qrDiv, {
+    text: shareUrl,
+    width: 200,
+    height: 200,
+    colorDark: "#000000",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.H
+  });
+  
+  // Simpan ke session untuk copy
+  window._currentShareUrl = shareUrl;
+}
+
+function copyShareLink() {
+  if (!window._currentShareUrl) {
+    generateShareQR();
+  }
+  navigator.clipboard.writeText(window._currentShareUrl);
+  alert('✅ Link berhasil disalin! Kirimkan ke teman.');
+}
+
+function shareViaWA() {
+  if (!window._currentShareUrl) {
+    generateShareQR();
+  }
+  const text = encodeURIComponent(`*📚 CBT Ujian - Data Mapel*\n\nSilakan klik link berikut untuk import data ujian:\n${window._currentShareUrl}\n\nAtau scan QR code yang diberikan.`);
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+function shareViaTwitter() {
+  if (!window._currentShareUrl) {
+    generateShareQR();
+  }
+  const text = encodeURIComponent(`📚 CBT Ujian - Data Mapel\n\nImport data ujian di sini: ${window._currentShareUrl}`);
+  window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
+}
+
+function closeQRModal() {
+  document.getElementById('qrModal').style.display = 'none';
+}
+
+// ======================== IMPORT VIA URL PARAMETER ========================
+function checkUrlForImport() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const importData = urlParams.get('import');
+  
+  if (importData) {
+    try {
+      const decodedData = decodeURIComponent(atob(importData));
+      const imported = JSON.parse(decodedData);
+      
+      if (imported.subjects && imported.students) {
+        if (confirm(`📥 Data siap diimport!\n\nMata Pelajaran: ${imported.subjects.length}\nSiswa: ${imported.students.length}\n\nImport sekarang?`)) {
+          DB.subjects = imported.subjects;
+          DB.students = imported.students.map(s => ({ ...s, results: {} }));
+          if (imported.teacher) DB.teacher = imported.teacher;
+          saveData();
+          alert('✅ Import berhasil! Halaman akan direfresh.');
+          window.location.href = window.location.pathname;
+        }
+      }
+    } catch(e) {
+      console.error('Import error:', e);
+    }
+  }
+}
+
+function openImportModal() {
+  document.getElementById('importModal').style.display = 'flex';
+  document.getElementById('importFileInput').value = '';
+  document.getElementById('importLinkInput').value = '';
+}
+
+function closeImportModal() {
+  document.getElementById('importModal').style.display = 'none';
+}
+
+function importFromFile() {
+  const fileInput = document.getElementById('importFileInput');
+  const file = fileInput.files[0];
+  
+  if (!file) {
+    alert('Pilih file .json terlebih dahulu!');
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      processImport(imported);
+    } catch(err) {
+      alert('Gagal import: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function importFromLink() {
+  const link = document.getElementById('importLinkInput').value.trim();
+  if (!link) {
+    alert('Masukkan link share!');
+    return;
+  }
+  
+  try {
+    const url = new URL(link);
+    const importData = url.searchParams.get('import');
+    if (!importData) throw new Error('Link tidak valid');
+    
+    const decodedData = decodeURIComponent(atob(importData));
+    const imported = JSON.parse(decodedData);
+    processImport(imported);
+  } catch(err) {
+    alert('Link tidak valid: ' + err.message);
+  }
+}
+
+function processImport(imported) {
+  if (!imported.subjects || !imported.students) {
+    alert('File tidak valid!');
+    return;
+  }
+  
+  if (confirm(`⚠️ IMPORT AKAN MENIMPA DATA!\n\nData baru:\n- ${imported.subjects.length} Mata Pelajaran\n- ${imported.students.length} Siswa\n\nLanjutkan?`)) {
+    DB.subjects = imported.subjects;
+    DB.students = imported.students.map(s => ({ 
+      username: s.username, 
+      name: s.name, 
+      password: s.password || 'password',
+      results: {} 
+    }));
+    if (imported.teacher) DB.teacher = imported.teacher;
+    saveData();
+    alert('✅ Import berhasil!');
+    closeImportModal();
+    if (currentUser?.role === 'guru') renderTeacherDashboard();
+    else renderStudentDashboard();
+  }
+}
+
+function exportDatabase() {
+  try {
+    const exportData = {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      subjects: DB.subjects,
+      students: DB.students.map(s => ({ username: s.username, name: s.name, password: s.password })),
+      teacher: DB.teacher
+    };
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cbt_data_${DB.subjects.length}mapel_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    alert(`✅ Database berhasil diexport!\n\n📊 ${DB.subjects.length} Mata Pelajaran\n📁 File siap dikirim`);
+  } catch(e) {
+    alert('Gagal export: ' + e.message);
+  }
+}
+
+// ======================== ANTI CHEAT & LOGIN ========================
+let currentUser = null;
+let currentExamSubject = null;
+let currentExamStudent = null;
+let examTimerInterval = null;
+let antiCheatActive = false;
+
+function startAntiCheat() {
+  antiCheatActive = true;
+  const handleVisibilityChange = () => {
+    if (!antiCheatActive) return;
+    if (document.hidden) {
+      alert("⚠️ PERINGATAN! Jangan keluar dari halaman ujian!");
+      forceEndExam("Meninggalkan halaman ujian");
+    }
+  };
+  const handleBeforeUnload = (e) => {
+    if (!antiCheatActive) return;
+    e.preventDefault();
+    e.returnValue = "Ujian akan dianggap selesai!";
+    forceEndExam("Mencoba keluar dari halaman");
+    return e.returnValue;
+  };
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  window._antiCheatListeners = { visibilitychange: handleVisibilityChange, beforeunload: handleBeforeUnload };
+}
+
+function stopAntiCheat() {
+  antiCheatActive = false;
+  if (window._antiCheatListeners) {
+    document.removeEventListener('visibilitychange', window._antiCheatListeners.visibilitychange);
+    window.removeEventListener('beforeunload', window._antiCheatListeners.beforeunload);
+  }
+}
+
+function forceEndExam(reason) {
+  if (!antiCheatActive) return;
+  clearInterval(examTimerInterval);
+  if (currentExamStudent && currentExamSubject) {
+    const result = currentExamStudent.results[currentExamSubject.id];
+    if (result && !result.finished) {
+      let pgCorrect = 0, pgTotal = 0;
+      currentExamSubject.questions.forEach(q => {
+        if (q.type === 'mcq') {
+          pgTotal++;
+          if (result.answers[q.id] === q.answer) pgCorrect++;
+        }
+      });
+      result.pgScore = pgTotal > 0 ? (pgCorrect / pgTotal) * 100 : 0;
+      result.finished = true;
+      result.forceFinished = true;
+      result.forceFinishReason = reason;
+      result.submittedAt = new Date().toISOString();
+      saveData();
+      alert(`⚠️ UJIAN DIAKHIRI OTOMATIS!\nAlasan: ${reason}`);
+    }
+  }
+  stopAntiCheat();
+  backToDashboard();
+}
+
+function togglePass() { const p = document.getElementById('loginPass'); p.type = p.type === 'password' ? 'text' : 'password'; }
+
+function performLogin() {
+  const role = document.getElementById('roleSelect').value;
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  
+  if (role === 'guru') {
+    if (user === DB.teacher.username && pass === DB.teacher.password) {
+      currentUser = { username: user, name: DB.teacher.name, role: 'guru' };
+      openApp();
+    } else {
+      alert('Guru: username=guru, password=admin');
+    }
+  } else {
+    const student = DB.students.find(s => s.username === user && s.password === pass);
+    if (student) {
+      currentUser = { username: student.username, name: student.name, role: 'murid' };
+      openApp();
+    } else {
+      alert('Siswa tidak ditemukan!');
+    }
+  }
+}
+
+function openApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('whoLabel').innerText = `${currentUser.name} (${currentUser.role})`;
+  if (currentUser.role === 'guru') renderTeacherDashboard();
+  else renderStudentDashboard();
+}
+
+function logout() {
+  if (examTimerInterval) clearInterval(examTimerInterval);
+  stopAntiCheat();
+  currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// ======================== GURU DASHBOARD ========================
+function renderTeacherDashboard() {
+  document.getElementById('teacherDashboard').style.display = 'block';
+  document.getElementById('studentDashboard').style.display = 'none';
+  document.getElementById('examPage').style.display = 'none';
+  document.getElementById('resultPage').style.display = 'none';
+  
+  document.getElementById('subjectCount').innerText = DB.subjects?.length || 0;
+  document.getElementById('studentCount').innerText = DB.students?.length || 0;
+  
+  const container = document.getElementById('subjectsTeacherList');
+  container.innerHTML = '';
+  
+  if (!DB.subjects || DB.subjects.length === 0) {
+    container.innerHTML = '<div class="card" style="text-align:center;color:#666">⚠️ Belum ada mata pelajaran. Klik "+ Tambah Mapel" untuk mulai.</div>';
+  } else {
+    DB.subjects.forEach(sub => {
+      const div = document.createElement('div');
+      div.className = 'subject-card';
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div><strong>📘 ${escapeHtml(sub.name)}</strong><br><span class="small">⏱️ ${sub.durationMinutes} menit | ${sub.questions?.length || 0} soal</span></div>
+          <div>
+            <button class="btn-small btn-delete" onclick="deleteSubject('${sub.id}')">🗑️ Hapus</button>
+            <button class="btn-small btn-export" onclick="exportSubjectCSV('${sub.id}')">📊 CSV</button>
+            <button class="btn-small btn-grade" onclick="openGradeEssayModal('${sub.id}')">✍️ Nilai</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  }
+  
+  const tbody = document.getElementById('studentsTableBody');
+  tbody.innerHTML = '';
+  DB.students.forEach(s => {
+    const row = tbody.insertRow();
+    row.insertCell(0).innerText = s.name;
+    row.insertCell(1).innerText = s.username;
+    const actionCell = row.insertCell(2);
+    actionCell.innerHTML = `<button class="btn-small btn-delete" onclick="deleteStudent('${s.username}')">Hapus</button>`;
+  });
+}
+
+function deleteSubject(id) { 
+  if(confirm('Hapus mata pelajaran?')){ 
+    DB.subjects = DB.subjects.filter(s => s.id !== id); 
+    saveData(); 
+    renderTeacherDashboard(); 
+  } 
+}
+
+function deleteStudent(username) {
+  if(confirm('Hapus siswa?')) {
+    DB.students = DB.students.filter(s => s.username !== username);
+    saveData();
+    renderTeacherDashboard();
+  }
+}
+
+// ======================== SISWA DASHBOARD ========================
+function renderStudentDashboard() {
+  document.getElementById('teacherDashboard').style.display = 'none';
+  document.getElementById('studentDashboard').style.display = 'block';
+  document.getElementById('examPage').style.display = 'none';
+  document.getElementById('resultPage').style.display = 'none';
+  
+  const container = document.getElementById('subjectsStudentList');
+  
+  if (!DB.subjects || DB.subjects.length === 0) {
+    container.innerHTML = `
+      <div class="card" style="text-align:center;color:#666">
+        ⚠️ Belum ada mata pelajaran.<br><br>
+        <span class="small">Silakan hubungi guru untuk mendapatkan QR Code atau link import.</span>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = '';
+  const studentData = DB.students.find(s => s.username === currentUser.username);
+  
+  DB.subjects.forEach(sub => {
+    const hasFinished = studentData?.results?.[sub.id]?.finished;
+    const statusHtml = hasFinished ? '<span class="badge badge-success">✓ Selesai</span>' : '<span class="badge badge-warning">⚡ Belum</span>';
+    const btnHtml = hasFinished ? 
+      `<button class="btn-small" style="background:#8b5cf6;color:#fff" onclick="viewResultStudent('${sub.id}')">📊 Lihat Nilai</button>` : 
+      `<button class="btn-small btn-add" onclick="startExam('${sub.id}')">✍️ Mulai Ujian</button>`;
+    
+    container.innerHTML += `
+      <div class="subject-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div><strong>📖 ${escapeHtml(sub.name)}</strong><br><span class="small">⏱️ ${sub.durationMinutes} menit | ${sub.questions?.length || 0} soal</span></div>
+          <div>${statusHtml} ${btnHtml}</div>
+        </div>
+      </div>
+    `;
+  });
+  
+  const scoreBox = document.getElementById('studentScoreBox');
+  const resultInfo = document.getElementById('studentResultInfo');
+  let resultHtml = '';
+  for(let sub of DB.subjects){
+    const res = studentData?.results?.[sub.id];
+    if(res && res.finished){
+      const total = (res.pgScore||0)*0.7 + (res.essayScore||0)*0.3;
+      resultHtml += `<div><b>${escapeHtml(sub.name)}</b>: PG=${res.pgScore?.toFixed(1)||0}, Essay=${res.essayScore?.toFixed(1)||0}, Akhir=${total.toFixed(1)}</div>`;
+    }
+  }
+  if(resultHtml) {
+    scoreBox.style.display = 'block';
+    resultInfo.innerHTML = resultHtml;
+  } else {
+    scoreBox.style.display = 'none';
+  }
+}
+
+function startExam(subjectId) {
+  const subject = DB.subjects.find(s => s.id === subjectId);
+  if(!subject) return alert('Mata pelajaran tidak ditemukan!');
+  const studentRef = DB.students.find(s => s.username === currentUser.username);
+  if(studentRef.results[subjectId]?.finished) return alert('Anda sudah menyelesaikan ujian ini!');
+  
+  currentExamSubject = subject;
+  currentExamStudent = studentRef;
+  if(!studentRef.results[subjectId]) {
+    studentRef.results[subjectId] = { answers: {}, essayText: {}, finished: false, pgScore: null, essayScore: null };
+    saveData();
+  }
+  renderExamPage();
+  startTimerExam(subject.durationMinutes);
+  startAntiCheat();
+}
+
+function renderExamPage() {
+  document.getElementById('studentDashboard').style.display = 'none';
+  document.getElementById('examPage').style.display = 'block';
+  document.getElementById('examSubjectTitle').innerHTML = currentExamSubject.name;
+  const container = document.getElementById('questionsContainer');
+  container.innerHTML = '';
+  const qs = currentExamSubject.questions;
+  document.getElementById('qTotal').innerText = qs.length;
+  const savedData = currentExamStudent.results[currentExamSubject.id];
+  
+  qs.forEach((q, idx) => {
+    const div = document.createElement('div');
+    div.className = 'soal';
+    if(q.type === 'mcq') {
+      let selected = savedData.answers[q.id] !== undefined ? savedData.answers[q.id] : '';
+      let html = `<h4>${idx+1}. ${escapeHtml(q.text)}</h4><div class="options">`;
+      q.choices.forEach((opt, ci) => {
+        const checked = (selected == ci) ? 'checked' : '';
+        html += `<label><input type="radio" name="q_${q.id}" value="${ci}" ${checked}> ${String.fromCharCode(65+ci)}. ${escapeHtml(opt)}</label>`;
+      });
+      html += '</div>';
+      div.innerHTML = html;
+    } else {
+      let essayVal = savedData.essayText?.[q.id] || '';
+      div.innerHTML = `<h4>${idx+1}. ${escapeHtml(q.text)}</h4><div class="essay"><textarea name="essay_${q.id}" placeholder="Tulis jawaban essay...">${escapeHtml(essayVal)}</textarea></div>`;
+    }
+    container.appendChild(div);
+  });
+  attachExamListeners();
+}
+
+function attachExamListeners() {
+  const container = document.getElementById('questionsContainer');
+  const radios = container.querySelectorAll('input[type="radio"]');
+  radios.forEach(radio => radio.addEventListener('change', (e) => {
+    const name = e.target.name;
+    const qid = name.substring(2);
+    const val = parseInt(e.target.value);
+    currentExamStudent.results[currentExamSubject.id].answers[qid] = val;
+    saveData();
+  }));
+  const textareas = container.querySelectorAll('textarea');
+  textareas.forEach(ta => {
+    ta.addEventListener('input', (e) => {
+      const name = ta.name;
+      const qid = name.substring(6);
+      if (!currentExamStudent.results[currentExamSubject.id].essayText) {
+        currentExamStudent.results[currentExamSubject.id].essayText = {};
+      }
+      currentExamStudent.results[currentExamSubject.id].essayText[qid] = ta.value;
+      saveData();
+    });
+  });
+}
+
+function saveProgress() { saveData(); alert('Progress disimpan!'); }
+
+function startTimerExam(minutes) {
+  if(examTimerInterval) clearInterval(examTimerInterval);
+  let totalSeconds = minutes * 60;
+  const timerDisplaySpan = document.getElementById('timerDisplay');
+  function updateDisplay() {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    timerDisplaySpan.innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+    if(totalSeconds <= 0) { clearInterval(examTimerInterval); submitExam(); }
+    totalSeconds--;
+  }
+  updateDisplay();
+  examTimerInterval = setInterval(updateDisplay, 1000);
+}
+
+function submitExam() {
+  clearInterval(examTimerInterval);
+  stopAntiCheat();
+  const subject = currentExamSubject;
+  const student = currentExamStudent;
+  const result = student.results[subject.id];
+  let pgCorrect = 0, pgTotal = 0;
+  subject.questions.forEach(q => {
+    if(q.type === 'mcq') {
+      pgTotal++;
+      if(result.answers[q.id] === q.answer) pgCorrect++;
+    }
+  });
+  const pgScore = pgTotal > 0 ? (pgCorrect / pgTotal) * 100 : 0;
+  result.pgScore = pgScore;
+  if(result.essayScore === undefined) result.essayScore = 0;
+  result.finished = true;
+  result.submittedAt = new Date().toISOString();
+  saveData();
+  alert(`✅ Ujian selesai! Nilai PG: ${pgScore.toFixed(1)}`);
+  backToDashboard();
+}
+
+function viewResultStudent(subjectId) {
+  const student = DB.students.find(s => s.username === currentUser.username);
+  const result = student?.results?.[subjectId];
+  if(!result || !result.finished) return alert('Data tidak ditemukan');
+  const subject = DB.subjects.find(s => s.id === subjectId);
+  const totalAkhir = (result.pgScore||0)*0.7 + (result.essayScore||0)*0.3;
+  document.getElementById('resultDetail').innerHTML = `
+    <h4>${escapeHtml(subject.name)}</h4>
+    <div>✅ Nilai PG: <b>${result.pgScore?.toFixed(1) || 0}</b></div>
+    <div>✍️ Nilai Essay: <b>${result.essayScore?.toFixed(1) || 0}</b></div>
+    <div>🎯 Total Akhir: <b>${totalAkhir.toFixed(1)}</b></div>
+    <hr><div class="small">📅 ${new Date(result.submittedAt).toLocaleString()}</div>
+  `;
+  document.getElementById('studentDashboard').style.display = 'none';
+  document.getElementById('resultPage').style.display = 'block';
+}
+
+function backToDashboard() {
+  if(examTimerInterval) clearInterval(examTimerInterval);
+  stopAntiCheat();
+  if(currentUser?.role === 'guru') renderTeacherDashboard();
+  else renderStudentDashboard();
+}
+
+// ======================== CRUD MAPEL ========================
+function openAddSubjectModal() {
+  document.getElementById('addSubjectModal').style.display = 'flex';
+  document.getElementById('pgQuestionsContainer').innerHTML = '';
+  document.getElementById('essayQuestionsContainer').innerHTML = '';
+  for(let i=0;i<2;i++) addPgField();
+  for(let i=0;i<1;i++) addEssayField();
+}
+
+function addPgField() {
+  const container = document.getElementById('pgQuestionsContainer');
+  const div = document.createElement('div');
+  div.className = 'subject-card';
+  div.innerHTML = `
+    <input class="input" placeholder="Teks soal PG" style="width:100%">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:5px">
+      <input class="input" placeholder="A"> <input class="input" placeholder="B">
+      <input class="input" placeholder="C"> <input class="input" placeholder="D">
+    </div>
+    <select class="input" style="margin-top:5px"><option value="0">Jawaban A</option><option value="1">Jawaban B</option><option value="2">Jawaban C</option><option value="3">Jawaban D</option></select>
+    <button class="btn-small" style="background:#ef4444;margin-top:8px" onclick="this.parentElement.remove()">Hapus</button>
+  `;
+  container.appendChild(div);
+}
+
+function addEssayField() {
+  const container = document.getElementById('essayQuestionsContainer');
+  const div = document.createElement('div');
+  div.className = 'subject-card';
+  div.innerHTML = `<input class="input" placeholder="Teks soal essay" style="width:100%"><button class="btn-small" style="background:#ef4444;margin-top:8px" onclick="this.parentElement.remove()">Hapus</button>`;
+  container.appendChild(div);
+}
+
+function saveNewSubject() {
+  const name = document.getElementById('subjectName').value.trim();
+  const duration = parseInt(document.getElementById('subjectDuration').value);
+  if(!name) return alert('Nama mapel harus diisi');
+  const questions = [];
+  const pgDivs = document.querySelectorAll('#pgQuestionsContainer > div');
+  pgDivs.forEach(div => {
+    const inputs = div.querySelectorAll('input');
+    if (inputs.length >= 5) {
+      const text = inputs[0].value;
+      const choices = [inputs[1].value, inputs[2].value, inputs[3].value, inputs[4].value];
+      const answer = parseInt(div.querySelector('select').value);
+      if (text && choices.every(c => c)) questions.push({ id: genId(), type: 'mcq', text, choices, answer });
+    }
+  });
+  const essayDivs = document.querySelectorAll('#essayQuestionsContainer > div');
+  essayDivs.forEach(div => {
+    const input = div.querySelector('input');
+    if (input.value.trim()) questions.push({ id: genId(), type: 'essay', text: input.value.trim() });
+  });
+  if (questions.length < 2) return alert('Minimal total 2 soal');
+  DB.subjects.push({ id: genId(), name, durationMinutes: duration, questions });
+  saveData();
+  closeAddSubjectModal();
+  renderTeacherDashboard();
+}
+
+function closeAddSubjectModal() { document.getElementById('addSubjectModal').style.display = 'none'; }
+
+// ======================== NILAI ESSAY ========================
+let currentGradingSubject = null;
+
+function openGradeEssayModal(subjectId) {
+  currentGradingSubject = DB.subjects.find(s => s.id === subjectId);
+  if (!currentGradingSubject) return;
+  const container = document.getElementById('gradeEssayContent');
+  container.innerHTML = `<h4>${escapeHtml(currentGradingSubject.name)}</h4>`;
+  let hasData = false;
+  
+  DB.students.forEach(student => {
+    const result = student.results?.[currentGradingSubject.id];
+    if (result && result.finished) {
+      const essayQuestions = currentGradingSubject.questions.filter(q => q.type === 'essay');
+      if (essayQuestions.length === 0) return;
+      hasData = true;
+      const studentDiv = document.createElement('div');
+      studentDiv.className = 'subject-card';
+      let essaysHtml = `<strong>👤 ${escapeHtml(student.name)} (${student.username})</strong><br>
+        <span class="badge ${result.essayScore > 0 ? 'badge-success' : 'badge-warning'}">Nilai Essay: ${result.essayScore || 0}</span>
+        <div style="margin-top:10px">`;
+      essayQuestions.forEach((essay, idx) => {
+        const studentAnswer = result.essayText?.[essay.id] || '(Tidak ada jawaban)';
+        essaysHtml += `
+          <div class="essay-item" style="margin-bottom:12px">
+            <div><strong>Soal ${idx+1}:</strong> ${escapeHtml(essay.text)}</div>
+            <div style="margin-top:5px"><strong>Jawaban:</strong></div>
+            <div style="background:#fff;padding:8px;border-radius:6px;margin:5px 0">${escapeHtml(studentAnswer)}</div>
+            <div><strong>Nilai (0-100):</strong> 
+              <input type="number" id="essay_score_${student.username}_${essay.id}" 
+                class="input" style="width:100px;display:inline-block;margin-left:8px" 
+                value="${result.essayGrades?.[essay.id] || result.essayScore || 0}" min="0" max="100" step="1">
+            </div>
+          </div>
+        `;
+      });
+      essaysHtml += `</div><hr>`;
+      studentDiv.innerHTML = essaysHtml;
+      container.appendChild(studentDiv);
+    }
+  });
+  if (!hasData) container.innerHTML += '<div class="card" style="text-align:center">Belum ada siswa yang mengerjakan ujian ini.</div>';
+  document.getElementById('gradeEssayModal').style.display = 'flex';
+}
+
+function saveEssayGrades() {
+  if (!currentGradingSubject) return;
+  DB.students.forEach(student => {
+    const result = student.results?.[currentGradingSubject.id];
+    if (result && result.finished) {
+      const essayQuestions = currentGradingSubject.questions.filter(q => q.type === 'essay');
+      let totalScore = 0, graded = 0;
+      if (!result.essayGrades) result.essayGrades = {};
+      essayQuestions.forEach(essay => {
+        const input = document.getElementById(`essay_score_${student.username}_${essay.id}`);
+        if (input) {
+          const score = parseInt(input.value) || 0;
+          result.essayGrades[essay.id] = Math.min(100, Math.max(0, score));
+          totalScore += result.essayGrades[essay.id];
+          graded++;
+        }
+      });
+      result.essayScore = graded > 0 ? totalScore / graded : 0;
+    }
+  });
+  saveData();
+  alert('Nilai essay disimpan!');
+  closeGradeModal();
+  renderTeacherDashboard();
+}
+
+function closeGradeModal() { document.getElementById('gradeEssayModal').style.display = 'none'; currentGradingSubject = null; }
+
+// ======================== UTILITY ========================
+function exportSubjectCSV(subjectId) {
+  const subject = DB.subjects.find(s => s.id === subjectId);
+  if (!subject) return;
+  let csv = "\uFEFFNama Siswa,Username,Nilai PG,Nilai Essay,Nilai Akhir\n";
+  DB.students.forEach(student => {
+    const result = student.results?.[subject.id];
+    let pg = 0, essay = 0, final = 0;
+    if (result?.finished) { pg = result.pgScore || 0; essay = result.essayScore || 0; final = (pg * 0.7) + (essay * 0.3); }
+    csv += `"${student.name}","${student.username}",${pg.toFixed(1)},${essay.toFixed(1)},${final.toFixed(1)}\n`;
+  });
+  downloadCSV(csv, `${subject.name}_nilai.csv`);
+}
+
+function exportAllCSV() {
+  let csv = "\uFEFFNama Siswa,Username,Mata Pelajaran,Nilai PG,Nilai Essay,Nilai Akhir\n";
+  DB.students.forEach(student => {
+    DB.subjects.forEach(subject => {
+      const result = student.results?.[subject.id];
+      let pg = 0, essay = 0, final = 0;
+      if (result?.finished) { pg = result.pgScore || 0; essay = result.essayScore || 0; final = (pg * 0.7) + (essay * 0.3); }
+      csv += `"${student.name}","${student.username}","${subject.name}",${pg.toFixed(1)},${essay.toFixed(1)},${final.toFixed(1)}\n`;
+    });
+  });
+  downloadCSV(csv, "semua_nilai.csv");
+}
+
+function downloadCSV(csv, filename) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function openAddStudentModal() { document.getElementById('addStudentModal').style.display = 'flex'; }
+function closeAddStudentModal() { document.getElementById('addStudentModal').style.display = 'none'; }
+
+function addStudent() {
+  const username = document.getElementById('studentUsername').value.trim();
+  const name = document.getElementById('studentName').value.trim();
+  const pass = document.getElementById('studentPassword').value.trim();
+  if(!username || !name) return alert('Isi username dan nama');
+  if(DB.students.find(s => s.username === username)) return alert('Username sudah ada');
+  DB.students.push({ username, name, password: pass || 'password', results: {} });
+  saveData();
+  closeAddStudentModal();
+  renderTeacherDashboard();
+}
+
+function escapeHtml(str) { 
+  if(!str) return ''; 
+  return str.replace(/[&<>]/g, function(m) {
+    if(m === '&') return '&amp;';
+    if(m === '<') return '&lt;';
+    if(m === '>') return '&gt;';
+    return m;
+  });
+}
+
+// Check URL parameter on load
+checkUrlForImport();
+loadData();
+</script>
+</body>
+</html>
